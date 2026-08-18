@@ -1,0 +1,6 @@
+{
+  "name": "UNRESOLVED",
+  "description": "An anthology-style interactive detective investigation game. Case 001: LAST CALL — search the crime scene, interrogate suspects, find contradictions, reconstruct the timeline, and solve the murder of Elias Voss.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
