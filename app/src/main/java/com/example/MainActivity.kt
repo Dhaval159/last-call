@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.thelastcall.audio.SoundManager
 import com.example.thelastcall.data.*
+import com.example.thelastcall.ui.components.*
 import com.example.thelastcall.ui.screens.*
 import com.example.ui.theme.BackgroundDark
 import com.example.ui.theme.UnresolvedTheme
@@ -111,12 +112,30 @@ class MainActivity : ComponentActivity() {
                                         else -> repository.openCaseFile(objective.focusTab ?: CaseFileTab.EVIDENCE)
                                     }
                                 },
+                                onOpenInvestigationLead = { leadId ->
+                                    repository.openLeadInvestigation(leadId)
+                                },
                                 onNotificationAction = { repository.handleNotificationAction() },
                                 onOpenSettings = { showSettingsDialog = true },
                                 onDismissNotification = {
                                     repository.dismissNotification()
                                 },
                                 onBack = { repository.navigateTo(Screen.MAIN_MENU) }
+                            )
+                        }
+
+                        Screen.INVESTIGATION_LEAD -> {
+                            LeadInvestigationScreen(
+                                state = state,
+                                caseDef = caseDef,
+                                onBackToHub = { repository.openCaseHub() },
+                                onSelectLead = { leadId -> repository.startLead(leadId) },
+                                onFollowObjective = { objective, leadId ->
+                                    repository.followLeadObjective(objective, leadId)
+                                },
+                                onCompleteLead = { leadId ->
+                                    repository.completeLead(leadId)
+                                }
                             )
                         }
 
@@ -139,7 +158,13 @@ class MainActivity : ComponentActivity() {
                                 onDismissTutorial = {
                                     repository.dismissTutorial()
                                 },
-                                onBack = { repository.openCaseHub() }
+                                onBack = {
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseHub()
+                                    }
+                                }
                             )
                         }
 
@@ -209,7 +234,13 @@ class MainActivity : ComponentActivity() {
                                         else -> repository.openCaseFile(objective.focusTab ?: CaseFileTab.EVIDENCE)
                                     }
                                 },
-                                onBack = { repository.openCaseHub() }
+                                onBack = {
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseHub()
+                                    }
+                                }
                             )
                         }
 
@@ -244,7 +275,13 @@ class MainActivity : ComponentActivity() {
                                 onDismissNotification = {
                                     repository.dismissNotification()
                                 },
-                                onBack = { repository.openCaseHub() }
+                                onBack = {
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseHub()
+                                    }
+                                }
                             )
                         }
 
@@ -270,7 +307,11 @@ class MainActivity : ComponentActivity() {
                                     repository.openCaseFile(CaseFileTab.SUSPECTS)
                                 },
                                 onBack = {
-                                    repository.openCaseFile(CaseFileTab.SUSPECTS)
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseFile(CaseFileTab.SUSPECTS)
+                                    }
                                 }
                             )
                         }
@@ -292,7 +333,11 @@ class MainActivity : ComponentActivity() {
                                     repository.openCaseFile(CaseFileTab.STATEMENTS)
                                 },
                                 onBack = {
-                                    repository.openCaseFile(CaseFileTab.SUSPECTS)
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseFile(CaseFileTab.SUSPECTS)
+                                    }
                                 }
                             )
                         }
@@ -311,7 +356,11 @@ class MainActivity : ComponentActivity() {
                                     repository.openCaseFile(CaseFileTab.EVIDENCE)
                                 },
                                 onBack = {
-                                    repository.openCaseHub()
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseHub()
+                                    }
                                 }
                             )
                         }
@@ -329,7 +378,11 @@ class MainActivity : ComponentActivity() {
                                     repository.selectSuspectForInterview(suspectId)
                                 },
                                 onBack = {
-                                    repository.openCaseFile(CaseFileTab.EVIDENCE)
+                                    if (state.leadNavigationContext != null) {
+                                        repository.returnFromLeadContext()
+                                    } else {
+                                        repository.openCaseFile(CaseFileTab.EVIDENCE)
+                                    }
                                 }
                             )
                         }
@@ -405,6 +458,29 @@ class MainActivity : ComponentActivity() {
                                 showSettingsDialog = false
                             }
                         )
+                    }
+
+                    // Investigation Moment Dialog Overlay
+                    state.pendingMomentId?.let { momentId ->
+                        caseDef.getInvestigationMoment(momentId)?.let { moment ->
+                            InvestigationMomentDialog(
+                                moment = moment,
+                                caseDef = caseDef,
+                                onAction = { repository.handleMomentAction(it) },
+                                onDismiss = { repository.dismissMoment() }
+                            )
+                        }
+                    }
+
+                    // Evidence Discovery Dialog Overlay
+                    state.pendingEvidenceDiscoveryId?.let { evidenceId ->
+                        caseDef.getEvidence(evidenceId)?.let { evidence ->
+                            EvidenceDiscoveryDialog(
+                                evidence = evidence,
+                                onExamineInDetail = { repository.selectEvidenceForDetail(it) },
+                                onDismiss = { repository.dismissEvidenceDiscovery() }
+                            )
+                        }
                     }
                 }
             }

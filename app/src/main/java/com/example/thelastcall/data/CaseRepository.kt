@@ -100,6 +100,9 @@ class CaseRepository(
                 unlockedContradictionIds = jsonArrayToSet(json.optJSONArray("unlockedContradictionIds")),
                 completedObjectiveIds = jsonArrayToSet(json.optJSONArray("completedObjectiveIds")),
                 inspectedHotspotIds = jsonArrayToSet(json.optJSONArray("inspectedHotspotIds")),
+                activeLeadId = if (json.has("activeLeadId") && !json.isNull("activeLeadId")) json.optString("activeLeadId", "").takeIf { it.isNotEmpty() } else null,
+                completedLeadIds = jsonArrayToSet(json.optJSONArray("completedLeadIds")),
+                completedLeadObjectiveIds = jsonArrayToSet(json.optJSONArray("completedLeadObjectiveIds")),
                 customConnections = loadCustomConnections(json),
                 playerTheory = playerTheory,
                 hasDiscoveredMotive = json.optBoolean("hasDiscoveredMotive", false),
@@ -169,13 +172,26 @@ class CaseRepository(
                 askedQuestionIds = jsonArrayToSet(json.optJSONArray("askedQuestionIds")),
                 recordedStatementIds = jsonArrayToSet(json.optJSONArray("recordedStatementIds")),
                 clearedSuspectIds = jsonArrayToSet(json.optJSONArray("clearedSuspectIds")),
+                presentedEvidenceRecords = jsonToMapOfSets(json.optJSONObject("presentedEvidenceRecords")),
                 unlockedTimelineEventIds = unlockedTimeline,
                 unlockedDeductionIds = jsonArrayToSet(json.optJSONArray("unlockedDeductionIds")),
                 unlockedContradictionIds = jsonArrayToSet(json.optJSONArray("unlockedContradictionIds")),
                 completedObjectiveIds = jsonArrayToSet(json.optJSONArray("completedObjectiveIds")),
+                inspectedHotspotIds = jsonArrayToSet(json.optJSONArray("inspectedHotspotIds")),
+                activeLeadId = if (json.has("activeLeadId") && !json.isNull("activeLeadId")) json.optString("activeLeadId", "").takeIf { it.isNotEmpty() } else null,
+                completedLeadIds = jsonArrayToSet(json.optJSONArray("completedLeadIds")),
+                completedLeadObjectiveIds = jsonArrayToSet(json.optJSONArray("completedLeadObjectiveIds")),
                 customConnections = loadCustomConnections(json),
                 hasDiscoveredMotive = json.optBoolean("hasDiscoveredMotive", false),
                 hasDiscoveredOpportunity = json.optBoolean("hasDiscoveredOpportunity", false),
+                hasSeenCrimeSceneTutorial = json.optBoolean("hasSeenCrimeSceneTutorial", false),
+                pendingChallengeId = if (json.has("pendingChallengeId") && !json.isNull("pendingChallengeId")) json.optString("pendingChallengeId", "").takeIf { it.isNotEmpty() } else null,
+                seenMomentIds = jsonArrayToSet(json.optJSONArray("seenMomentIds")),
+                pendingMomentId = if (json.has("pendingMomentId") && !json.isNull("pendingMomentId")) json.optString("pendingMomentId", "").takeIf { it.isNotEmpty() } else null,
+                pendingEvidenceDiscoveryId = if (json.has("pendingEvidenceDiscoveryId") && !json.isNull("pendingEvidenceDiscoveryId")) json.optString("pendingEvidenceDiscoveryId", "").takeIf { it.isNotEmpty() } else null,
+                playerNotes = loadPlayerNotes(json),
+                activityLog = loadActivityLog(json),
+                investigationMinutes = json.optInt("investigationMinutes", 0),
                 settings = settings
             )
         } catch (_: Exception) {
@@ -195,10 +211,11 @@ class CaseRepository(
         if (_caseDefinition.id == caseId) {
             _state.value = CaseState(
                 caseId = _caseDefinition.id,
+                caseStatus = CaseStatus.NOT_STARTED,
+                currentScreen = Screen.MAIN_MENU,
                 unlockedTimelineEventIds = _caseDefinition.initialUnlockedTimelineIds,
                 settings = _state.value.settings
             )
-            evaluateState(playSound = false)
         }
     }
 
@@ -328,6 +345,7 @@ class CaseRepository(
             it.copy(
                 discoveredEvidenceIds = result.updatedDiscoveredEvidenceIds,
                 inspectedHotspotIds = result.updatedInspectedHotspotIds,
+                pendingEvidenceDiscoveryId = result.newlyDiscoveredEvidence.firstOrNull()?.id ?: it.pendingEvidenceDiscoveryId,
                 activeNotification = if (result.newlyDiscoveredEvidence.isNotEmpty()) {
                     GameNotification(
                         title = "New Evidence",
@@ -350,6 +368,11 @@ class CaseRepository(
         evaluateState(playSound = false)
         saveState()
         return Pair(result.primary, result.secondary)
+    }
+
+    fun dismissEvidenceDiscovery() {
+        _state.update { it.copy(pendingEvidenceDiscoveryId = null) }
+        saveState()
     }
 
     fun askQuestion(question: InterviewQuestion) {
@@ -624,7 +647,7 @@ class CaseRepository(
             newDeductions.minus(s.unlockedDeductionIds).firstOrNull()?.let { id -> _caseDefinition.getDeduction(id)?.title }
         } else null
 
-        // Objectives evaluation
+        // Legacy objectives evaluation
         val prevObjectives = s.completedObjectiveIds
         val newObjectives = InvestigationEngine.evaluateObjectives(s.copy(
             unlockedTimelineEventIds = newTimeline,
@@ -632,27 +655,69 @@ class CaseRepository(
         ), _caseDefinition)
         val newlyCompletedObjective = newObjectives.size > prevObjectives.size
 
+        // Leads and Lead Objectives evaluation
+        val prevLeadObjectives = s.completedLeadObjectiveIds
+        val prevCompletedLeads = s.completedLeadIds
+        val evalState = s.copy(
+            unlockedTimelineEventIds = newTimeline,
+            unlockedDeductionIds = newDeductions,
+            completedObjectiveIds = newObjectives
+        )
+        val newLeadObjectives = InvestigationEngine.evaluateLeadObjectives(evalState, _caseDefinition)
+        val newCompletedLeads = InvestigationEngine.evaluateCompletedLeads(
+            evalState.copy(completedLeadObjectiveIds = newLeadObjectives),
+            _caseDefinition
+        )
+        val newlyCompletedLeadObjective = newLeadObjectives.size > prevLeadObjectives.size
+        val newlyCompletedLead = newCompletedLeads.size > prevCompletedLeads.size
+
         // Accusation readiness
         val readiness = AccusationEngine.evaluateReadiness(s.copy(
             unlockedTimelineEventIds = newTimeline,
             unlockedDeductionIds = newDeductions,
-            completedObjectiveIds = newObjectives
+            completedObjectiveIds = newObjectives,
+            completedLeadIds = newCompletedLeads,
+            completedLeadObjectiveIds = newLeadObjectives
         ), _caseDefinition)
 
         val caseStatus = if (s.caseStatus == CaseStatus.NOT_STARTED) {
-            CaseStatus.IN_PROGRESS
+            if (s.discoveredEvidenceIds.isNotEmpty() || s.interviewedSuspectIds.isNotEmpty() || s.askedQuestionIds.isNotEmpty()) {
+                CaseStatus.IN_PROGRESS
+            } else {
+                CaseStatus.NOT_STARTED
+            }
         } else if (s.caseStatus == CaseStatus.IN_PROGRESS && readiness.isReadyForAccusation) {
             CaseStatus.READY_FOR_ACCUSATION
         } else {
             s.caseStatus
         }
 
+        // Active lead calculation
+        val currentActiveLead = if (s.activeLeadId != null && !newCompletedLeads.contains(s.activeLeadId)) {
+            s.activeLeadId
+        } else {
+            _caseDefinition.getCurrentInvestigationLead(s.copy(
+                completedLeadIds = newCompletedLeads,
+                completedLeadObjectiveIds = newLeadObjectives
+            ))?.id
+        }
+
+        // Investigation Moments evaluation
+        val pendingMoments = InvestigationEngine.evaluateInvestigationMoments(evalState, _caseDefinition)
+        val newPendingMoment = if (s.pendingMomentId == null && pendingMoments.isNotEmpty()) {
+            pendingMoments.first()
+        } else null
+
         _state.update {
             it.copy(
                 unlockedTimelineEventIds = newTimeline,
                 unlockedDeductionIds = newDeductions,
                 completedObjectiveIds = newObjectives,
+                completedLeadObjectiveIds = newLeadObjectives,
+                completedLeadIds = newCompletedLeads,
+                activeLeadId = currentActiveLead ?: it.activeLeadId,
                 caseStatus = caseStatus,
+                pendingMomentId = newPendingMoment?.id ?: it.pendingMomentId,
                 activeNotification = when {
                     it.activeNotification != null -> it.activeNotification
                     newlyAddedDeductionTitle != null -> GameNotification(
@@ -663,6 +728,28 @@ class CaseRepository(
                         actionTarget = Screen.CASE_FILE,
                         actionTab = CaseFileTab.DEDUCTIONS
                     )
+                    newlyCompletedLead -> {
+                        val completedNow = newCompletedLeads.minus(prevCompletedLeads).firstOrNull()
+                        val lead = completedNow?.let { id -> _caseDefinition.getLead(id) }
+                        if (lead?.isMajorBreakthrough == true) {
+                            GameNotification(
+                                title = "Investigation Breakthrough!",
+                                message = lead.breakthroughTitle ?: lead.title,
+                                type = NotificationType.LEAD,
+                                actionLabel = "Review Lead",
+                                actionTarget = Screen.INVESTIGATION_LEAD
+                            )
+                        } else {
+                            val nextLead = lead?.nextLeadId?.let { id -> _caseDefinition.getLead(id) }
+                            GameNotification(
+                                title = "Lead Complete!",
+                                message = lead?.let { "${it.title} completed." } ?: "Investigation lead concluded.",
+                                type = NotificationType.LEAD,
+                                actionLabel = if (nextLead != null) "Next Lead" else "Case Hub",
+                                actionTarget = if (nextLead != null) Screen.INVESTIGATION_LEAD else Screen.CASE_HUB
+                            )
+                        }
+                    }
                     newlyCompletedObjective -> {
                         val completedNow = newObjectives.minus(prevObjectives).firstOrNull()
                         val newLead = completedNow?.let { completedId ->
@@ -683,6 +770,13 @@ class CaseRepository(
             )
         }
 
+        if (newPendingMoment != null) {
+            logActivity(ActivityKind.LEAD, "${newPendingMoment.type.displayName.uppercase()}: ${newPendingMoment.title}")
+            if (newPendingMoment.isMajorBreakthrough && playSound) {
+                soundManager.playDeductionFormed(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+            }
+        }
+
         if (newlyAddedDeduction) {
             newDeductions.minus(s.unlockedDeductionIds).firstOrNull()?.let { id ->
                 _caseDefinition.getDeduction(id)?.let { d ->
@@ -693,7 +787,23 @@ class CaseRepository(
         if (newTimeline.size > s.unlockedTimelineEventIds.size) {
             logActivity(ActivityKind.TIMELINE, "Incident timeline reconstructed with verified chronological records.")
         }
-        if (newlyCompletedObjective) {
+        if (newlyCompletedLead) {
+            newCompletedLeads.minus(prevCompletedLeads).firstOrNull()?.let { id ->
+                _caseDefinition.getLead(id)?.let { lead ->
+                    if (lead.isMajorBreakthrough) {
+                        logActivity(ActivityKind.LEAD, "INVESTIGATION BREAKTHROUGH: ${lead.breakthroughTitle ?: lead.title}.")
+                    } else {
+                        logActivity(ActivityKind.LEAD, "LEAD COMPLETE: ${lead.title}.")
+                    }
+                }
+            }
+        } else if (newlyCompletedLeadObjective) {
+            newLeadObjectives.minus(prevLeadObjectives).firstOrNull()?.let { objId ->
+                _caseDefinition.leads.flatMap { it.objectives }.firstOrNull { it.id == objId }?.let { obj ->
+                    logActivity(ActivityKind.LEAD, "Lead objective met: ${obj.title}.")
+                }
+            }
+        } else if (newlyCompletedObjective) {
             newObjectives.minus(prevObjectives).firstOrNull()?.let { id ->
                 _caseDefinition.objectives.firstOrNull { it.id == id }?.let { lead ->
                     logActivity(ActivityKind.LEAD, "Investigative lead pursued: ${lead.title}.")
@@ -703,6 +813,119 @@ class CaseRepository(
 
         if (newlyAddedDeduction && playSound) {
             soundManager.playDeductionFormed(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+        }
+    }
+
+    fun dismissMoment() {
+        val currentMomentId = _state.value.pendingMomentId
+        _state.update {
+            it.copy(
+                pendingMomentId = null,
+                seenMomentIds = if (currentMomentId != null) it.seenMomentIds + currentMomentId else it.seenMomentIds
+            )
+        }
+        saveState()
+        soundManager.playUiClick(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+    }
+
+    fun handleMomentAction(moment: InvestigationMoment) {
+        dismissMoment()
+        when (val target = moment.actionTarget) {
+            is LeadActionTarget.CrimeScene -> enterCrimeScene()
+            is LeadActionTarget.Evidence -> selectEvidenceForDetail(target.evidenceId)
+            is LeadActionTarget.Suspect -> selectSuspectForInterview(target.suspectId)
+            is LeadActionTarget.Communication -> openCommunications()
+            is LeadActionTarget.Timeline -> openCaseFile(CaseFileTab.TIMELINE)
+            is LeadActionTarget.Reasoning -> openCaseFile(target.tab)
+            is LeadActionTarget.CaseFile -> openCaseFile(target.tab)
+            is LeadActionTarget.DetectiveBoard -> openDetectiveBoard()
+            is LeadActionTarget.CaseReview -> openCaseReview()
+            is LeadActionTarget.Hub -> openCaseHub()
+        }
+    }
+
+    fun openLeadInvestigation(leadId: String? = null) {
+        val targetLeadId = leadId ?: _state.value.activeLeadId ?: _caseDefinition.getCurrentInvestigationLead(_state.value)?.id
+        _state.update {
+            it.copy(
+                activeLeadId = targetLeadId ?: it.activeLeadId,
+                currentScreen = Screen.INVESTIGATION_LEAD
+            )
+        }
+        saveState()
+        soundManager.playUiClick(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+    }
+
+    fun startLead(leadId: String) {
+        val lead = _caseDefinition.getLead(leadId)
+        _state.update {
+            it.copy(
+                activeLeadId = leadId,
+                currentScreen = Screen.INVESTIGATION_LEAD
+            )
+        }
+        if (lead != null) {
+            logActivity(ActivityKind.LEAD, "Investigating Lead: ${lead.title}.")
+        }
+        saveState()
+        soundManager.playUiClick(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+    }
+
+    fun completeLead(leadId: String) {
+        val lead = _caseDefinition.getLead(leadId) ?: return
+        val nextLead = lead.nextLeadId?.let { _caseDefinition.getLead(it) }
+        val updatedCompleted = _state.value.completedLeadIds + leadId
+        _state.update {
+            it.copy(
+                completedLeadIds = updatedCompleted,
+                activeLeadId = nextLead?.id ?: it.activeLeadId
+            )
+        }
+        if (lead.isMajorBreakthrough) {
+            logActivity(ActivityKind.LEAD, "INVESTIGATION BREAKTHROUGH: ${lead.breakthroughTitle ?: lead.title}.")
+            soundManager.playDeductionFormed(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+        } else {
+            logActivity(ActivityKind.LEAD, "LEAD COMPLETE: ${lead.title}.")
+            soundManager.playUiClick(_state.value.settings.soundEnabled, _state.value.settings.hapticsEnabled)
+        }
+        evaluateState(playSound = true)
+        saveState()
+    }
+
+    fun followLeadObjective(objective: LeadObjective, leadId: String) {
+        val lead = _caseDefinition.getLead(leadId)
+        val navContext = LeadNavigationContext(
+            sourceLeadId = leadId,
+            sourceObjectiveId = objective.id,
+            leadTitle = lead?.title ?: "Investigation Lead"
+        )
+        _state.update {
+            it.copy(
+                activeLeadId = leadId,
+                leadNavigationContext = navContext
+            )
+        }
+        when (val target = objective.target) {
+            is LeadActionTarget.CrimeScene -> enterCrimeScene()
+            is LeadActionTarget.Evidence -> selectEvidenceForDetail(target.evidenceId)
+            is LeadActionTarget.Suspect -> selectSuspectForInterview(target.suspectId)
+            is LeadActionTarget.Communication -> openCommunications()
+            is LeadActionTarget.Timeline -> openCaseFile(CaseFileTab.TIMELINE)
+            is LeadActionTarget.Reasoning -> openCaseFile(target.tab)
+            is LeadActionTarget.CaseFile -> openCaseFile(target.tab)
+            is LeadActionTarget.DetectiveBoard -> openDetectiveBoard()
+            is LeadActionTarget.CaseReview -> openCaseReview()
+            is LeadActionTarget.Hub -> openCaseHub()
+        }
+    }
+
+    fun returnFromLeadContext() {
+        val context = _state.value.leadNavigationContext
+        _state.update { it.copy(leadNavigationContext = null) }
+        if (context != null) {
+            openLeadInvestigation(context.sourceLeadId)
+        } else {
+            openLeadInvestigation()
         }
     }
 
@@ -788,13 +1011,14 @@ class CaseRepository(
             Screen.CASE_INTRO -> navigateTo(Screen.MAIN_MENU)
             Screen.BRIEFING -> navigateTo(Screen.MAIN_MENU)
             Screen.CASE_HUB -> navigateTo(Screen.MAIN_MENU)
-            Screen.CRIME_SCENE -> openCaseHub()
+            Screen.INVESTIGATION_LEAD -> openCaseHub()
+            Screen.CRIME_SCENE -> if (_state.value.leadNavigationContext != null) returnFromLeadContext() else openCaseHub()
             Screen.CASE_FILE -> openCaseHub()
             Screen.DETECTIVE_BOARD -> openCaseHub()
-            Screen.SUSPECT_INTERVIEW -> openCaseFile(CaseFileTab.SUSPECTS)
-            Screen.EVIDENCE_DETAIL -> openCaseFile(CaseFileTab.EVIDENCE)
+            Screen.SUSPECT_INTERVIEW -> if (_state.value.leadNavigationContext != null) returnFromLeadContext() else openCaseFile(CaseFileTab.SUSPECTS)
+            Screen.EVIDENCE_DETAIL -> if (_state.value.leadNavigationContext != null) returnFromLeadContext() else openCaseFile(CaseFileTab.EVIDENCE)
             Screen.PERSON_PROFILE -> openCaseFile(CaseFileTab.SUSPECTS)
-            Screen.COMMUNICATIONS -> openCaseHub()
+            Screen.COMMUNICATIONS -> if (_state.value.leadNavigationContext != null) returnFromLeadContext() else openCaseHub()
             Screen.FINAL_CASE_REVIEW -> openCaseFile(CaseFileTab.THEORY)
             Screen.FINAL_ACCUSATION -> navigateTo(Screen.FINAL_CASE_REVIEW)
             Screen.CASE_RESULT -> navigateTo(Screen.MAIN_MENU)
@@ -937,10 +1161,16 @@ class CaseRepository(
                 put("unlockedContradictionIds", setToJsonArray(s.unlockedContradictionIds))
                 put("completedObjectiveIds", setToJsonArray(s.completedObjectiveIds))
                 put("inspectedHotspotIds", setToJsonArray(s.inspectedHotspotIds))
+                put("activeLeadId", s.activeLeadId ?: JSONObject.NULL)
+                put("completedLeadIds", setToJsonArray(s.completedLeadIds))
+                put("completedLeadObjectiveIds", setToJsonArray(s.completedLeadObjectiveIds))
                 put("hasDiscoveredMotive", s.hasDiscoveredMotive)
                 put("hasDiscoveredOpportunity", s.hasDiscoveredOpportunity)
                 put("hasSeenCrimeSceneTutorial", s.hasSeenCrimeSceneTutorial)
                 put("pendingChallengeId", s.pendingChallengeId ?: JSONObject.NULL)
+                put("seenMomentIds", setToJsonArray(s.seenMomentIds))
+                put("pendingMomentId", s.pendingMomentId ?: JSONObject.NULL)
+                put("pendingEvidenceDiscoveryId", s.pendingEvidenceDiscoveryId ?: JSONObject.NULL)
                 put("investigationMinutes", s.investigationMinutes)
                 put("playerNotes", playerNotesToJson(s.playerNotes))
                 put("activityLog", activityLogToJson(s.activityLog))

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -32,13 +33,15 @@ fun CaseHubScreen(
     onOpenCaseReview: () -> Unit,
     onOpenCommunications: () -> Unit,
     onFollowLead: (Objective) -> Unit,
+    onOpenInvestigationLead: (String?) -> Unit = {},
     onNotificationAction: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismissNotification: () -> Unit,
     onBack: () -> Unit
 ) {
     val readiness = state.getCaseReadiness(caseDef)
-    val currentLead = caseDef.getCurrentLead(state)
+    val currentObjective = caseDef.getCurrentLead(state)
+    val currentInvestigationLead = caseDef.getCurrentInvestigationLead(state)
     val caseTitle = "${caseDef.id} • ${caseDef.title.uppercase()}"
 
     Scaffold(
@@ -72,14 +75,40 @@ fun CaseHubScreen(
                     )
                 }
 
-                item { HubSectionLabel("CURRENT LEAD") }
+                item {
+                    CentralQuestionBanner(
+                        questionText = caseDef.getDynamicCentralQuestion(state)
+                    )
+                }
+
+                item { HubSectionLabel("CURRENT INVESTIGATION") }
 
                 item {
-                    CurrentLeadCard(
-                        objective = currentLead,
-                        completedCount = state.completedObjectiveIds.size,
-                        totalCount = caseDef.objectives.size,
-                        onFollow = { lead -> lead.let(onFollowLead) }
+                    if (caseDef.leads.isNotEmpty() && currentInvestigationLead != null) {
+                        ActiveInvestigationLeadCard(
+                            lead = currentInvestigationLead,
+                            state = state,
+                            caseDef = caseDef,
+                            onOpenLead = { onOpenInvestigationLead(currentInvestigationLead.id) }
+                        )
+                    } else {
+                        CurrentLeadCard(
+                            objective = currentObjective,
+                            completedCount = state.completedObjectiveIds.size,
+                            totalCount = caseDef.objectives.size,
+                            onFollow = { lead -> lead.let(onFollowLead) }
+                        )
+                    }
+                }
+
+                item { HubSectionLabel("PEOPLE OF INTEREST") }
+
+                item {
+                    PeopleOfInterestSection(
+                        suspects = caseDef.suspects,
+                        state = state,
+                        caseDef = caseDef,
+                        onSelectSuspect = { onOpenCaseFile(CaseFileTab.SUSPECTS) }
                     )
                 }
 
@@ -321,6 +350,125 @@ private fun CaseIdentityHeader(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("OBJECTIVES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = CaseSlate)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveInvestigationLeadCard(
+    lead: InvestigationLead,
+    state: CaseState,
+    caseDef: CaseDefinition,
+    onOpenLead: () -> Unit
+) {
+    val isCompleted = lead.isCompleted(state, caseDef) || state.completedLeadIds.contains(lead.id)
+    val completedObjCount = lead.objectives.count { obj ->
+        state.completedLeadObjectiveIds.contains(obj.id) || obj.condition?.isMet(state, caseDef) == true
+    }
+    val totalObjCount = lead.objectives.size
+
+    Surface(
+        color = ArchiveCard,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isCompleted) StatusConfirmed.copy(alpha = 0.6f) else CaseGold.copy(alpha = 0.7f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenLead() }
+            .testTag("hub_active_lead_card")
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Search,
+                        contentDescription = null,
+                        tint = if (isCompleted) StatusConfirmed else CaseGold,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "LEAD 0${lead.orderIndex} • ${if (isCompleted) "COMPLETED" else "ACTIVE INVESTIGATION"}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        ),
+                        color = if (isCompleted) StatusConfirmed else CaseGold
+                    )
+                }
+                Text(
+                    text = "$completedObjCount / $totalObjCount OBJECTIVES",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (completedObjCount == totalObjCount) StatusConfirmed else CaseSlate
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = lead.title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = TextPrimary
+            )
+
+            if (lead.subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = lead.subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AccentAmberLight
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = lead.shortDescription.ifBlank { lead.briefing },
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onOpenLead,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isCompleted) SurfaceElevated else CaseGold,
+                    contentColor = if (isCompleted) TextPrimary else ArchiveBackground
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .testTag("hub_investigate_lead_button")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Explore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isCompleted) "REVIEW LEAD DOSSIER" else "CONTINUE INVESTIGATION",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    )
                 }
             }
         }
@@ -740,3 +888,188 @@ private data class HubEntry(
     val onClick: () -> Unit,
     val tag: String
 )
+
+@Composable
+private fun CentralQuestionBanner(questionText: String) {
+    Surface(
+        color = Color(0xFF131922),
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, AccentCyan.copy(alpha = 0.4f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("hub_central_question_banner")
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(AccentCyan.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.HelpOutline,
+                    contentDescription = null,
+                    tint = AccentCyan,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "CENTRAL INVESTIGATION QUESTION",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    ),
+                    color = AccentCyan
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = questionText,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = TextPrimary,
+                    lineHeight = 18.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeopleOfInterestSection(
+    suspects: List<Suspect>,
+    state: CaseState,
+    caseDef: CaseDefinition,
+    onSelectSuspect: (String) -> Unit
+) {
+    Surface(
+        color = ArchiveCard,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ArchiveDivider),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("hub_people_section")
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "PERSONS OF INTEREST (${suspects.size})",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    ),
+                    color = CaseGold
+                )
+                Text(
+                    text = "${state.interviewedSuspectIds.size} INTERVIEWED",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = CaseSlate
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                suspects.forEach { suspect ->
+                    val isCleared = state.clearedSuspectIds.contains(suspect.id)
+                    val presented = state.presentedEvidenceRecords[suspect.id] ?: emptySet()
+                    val askedCount = state.askedQuestionIds.filter { qId ->
+                        caseDef.questions.any { it.id == qId && it.suspectId == suspect.id }
+                    }.size
+                    val hasContradictionExposed = caseDef.contradictions.filter { it.suspectId == suspect.id }
+                        .any { state.unlockedContradictionIds.contains(it.id) }
+                    val hasMotiveExposed = (caseDef.culpritSolution.culpritSuspectId == suspect.id && state.hasDiscoveredMotive) ||
+                        caseDef.reactions.filter { it.suspectId == suspect.id && it.triggersMotiveId != null }
+                            .any { presented.contains(it.evidenceId) }
+
+                    val behaviorState = suspect.getDynamicBehaviorState(
+                        isCleared = isCleared,
+                        hasContradictionExposed = hasContradictionExposed,
+                        hasMotiveExposed = hasMotiveExposed,
+                        askedCount = askedCount,
+                        presentedEvidenceCount = presented.size
+                    )
+
+                    val badgeColor = when (behaviorState) {
+                        SuspectBehaviorState.CORNERED -> AccentRed
+                        SuspectBehaviorState.DEFENSIVE -> AccentAmber
+                        SuspectBehaviorState.NERVOUS -> AccentCyan
+                        SuspectBehaviorState.ALIBI_VERIFIED -> StatusConfirmed
+                        SuspectBehaviorState.COOPERATIVE -> Color(0xFF66BB6A)
+                        SuspectBehaviorState.CALM -> TextMuted
+                    }
+
+                    Surface(
+                        color = Color(0xFF151820),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (hasContradictionExposed) AccentRed.copy(alpha = 0.5f) else ArchiveDivider
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectSuspect(suspect.id) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Color(suspect.avatarColorHex), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = suspect.initials,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = suspect.name,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = suspect.relationship,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+
+                            Surface(
+                                color = badgeColor.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, badgeColor.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = behaviorState.label.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = badgeColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

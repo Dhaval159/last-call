@@ -234,6 +234,58 @@ object CaseValidator {
             }
         }
 
+        // 12. Investigation Leads
+        val leadIds = caseDef.leads.map { it.id }.toSet()
+        if (caseDef.leads.size != leadIds.size) {
+            errors.add("Investigation leads contain duplicate IDs.")
+        }
+        caseDef.leads.forEach { lead ->
+            if (lead.title.isBlank()) errors.add("Lead ${lead.id} has a blank title.")
+            if (lead.briefing.isBlank()) errors.add("Lead ${lead.id} has a blank briefing.")
+            lead.unlockLeadIds.forEach { reqLeadId ->
+                if (!leadIds.contains(reqLeadId)) {
+                    errors.add("Lead ${lead.id} references non-existent unlock lead $reqLeadId.")
+                }
+            }
+            lead.unlockEvidenceIds.forEach { reqEvId ->
+                if (!evidenceIds.contains(reqEvId)) {
+                    errors.add("Lead ${lead.id} references non-existent unlock evidence $reqEvId.")
+                }
+            }
+            lead.associatedEvidenceIds.forEach { evId ->
+                if (!evidenceIds.contains(evId)) {
+                    errors.add("Lead ${lead.id} references non-existent associated evidence $evId.")
+                }
+            }
+            lead.associatedSuspectIds.forEach { sId ->
+                if (!suspectIds.contains(sId)) {
+                    errors.add("Lead ${lead.id} references non-existent associated suspect $sId.")
+                }
+            }
+            if (lead.nextLeadId != null && !leadIds.contains(lead.nextLeadId)) {
+                errors.add("Lead ${lead.id} references non-existent next lead ${lead.nextLeadId}.")
+            }
+        }
+
+        // 13. Investigation Moments
+        val momentIds = caseDef.investigationMoments.map { it.id }.toSet()
+        if (caseDef.investigationMoments.size != momentIds.size) {
+            errors.add("Investigation moments contain duplicate IDs.")
+        }
+        caseDef.investigationMoments.forEach { moment ->
+            if (moment.title.isBlank()) errors.add("Moment ${moment.id} has a blank title.")
+            if (moment.narrativeText.isBlank()) errors.add("Moment ${moment.id} has blank narrative text.")
+            if (moment.associatedEvidenceId != null && !evidenceIds.contains(moment.associatedEvidenceId)) {
+                errors.add("Moment ${moment.id} references non-existent associated evidence ${moment.associatedEvidenceId}.")
+            }
+            if (moment.associatedSuspectId != null && !suspectIds.contains(moment.associatedSuspectId)) {
+                errors.add("Moment ${moment.id} references non-existent associated suspect ${moment.associatedSuspectId}.")
+            }
+            if (moment.associatedLeadId != null && !leadIds.contains(moment.associatedLeadId)) {
+                errors.add("Moment ${moment.id} references non-existent associated lead ${moment.associatedLeadId}.")
+            }
+        }
+
         // Warnings for loose ends
         if (caseDef.motives.none { it.key == sol.correctMotiveKey }) {
             warnings.add("Correct motive key ${sol.correctMotiveKey} not found in case motives list.")

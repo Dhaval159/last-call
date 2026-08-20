@@ -192,4 +192,32 @@ class Case002DataIntegrityTest {
         assertTrue(registeredCase?.isAvailable == true)
         assertFalse(registeredCase?.isPlaceholder == true)
     }
+
+    @Test
+    fun `verify investigation moments integrity`() {
+        assertEquals(6, Case002Data.INVESTIGATION_MOMENTS.size)
+        val momentIds = Case002Data.INVESTIGATION_MOMENTS.map { it.id }.toSet()
+        assertEquals(6, momentIds.size)
+        val evidenceIds = Case002Data.EVIDENCE_LIST.map { it.id }.toSet()
+        val leadIds = Case002Data.LEADS.map { it.id }.toSet()
+
+        Case002Data.INVESTIGATION_MOMENTS.forEach { moment ->
+            assertTrue("Moment ${moment.id} title must not be blank", moment.title.isNotBlank())
+            assertTrue("Moment ${moment.id} narrative must not be blank", moment.narrativeText.isNotBlank())
+            if (moment.associatedEvidenceId != null) {
+                assertTrue("Moment ${moment.id} evidence must exist", evidenceIds.contains(moment.associatedEvidenceId))
+            }
+            if (moment.associatedLeadId != null) {
+                assertTrue("Moment ${moment.id} lead must exist", leadIds.contains(moment.associatedLeadId))
+            }
+        }
+    }
+
+    @Test
+    fun `verify dynamic central question returns narrative focus`() {
+        val state = com.example.thelastcall.data.CaseState(caseId = "CASE-002")
+        val question = Case002Data.getDynamicCentralQuestion(state)
+        assertTrue("Dynamic question must not be blank", question.isNotBlank())
+        assertTrue("Dynamic question must reflect lead 1", question.contains("wine cellar") || question.contains("staged"))
+    }
 }

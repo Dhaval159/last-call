@@ -205,4 +205,33 @@ object InvestigationEngine {
         }
         return completed
     }
+
+    fun evaluateLeadObjectives(state: CaseState, caseDef: CaseDefinition): Set<String> {
+        val completed = state.completedLeadObjectiveIds.toMutableSet()
+        caseDef.leads.forEach { lead ->
+            lead.objectives.forEach { obj ->
+                if (obj.condition != null && obj.condition.isMet(state, caseDef)) {
+                    completed.add(obj.id)
+                }
+            }
+        }
+        return completed
+    }
+
+    fun evaluateCompletedLeads(state: CaseState, caseDef: CaseDefinition): Set<String> {
+        val completed = state.completedLeadIds.toMutableSet()
+        caseDef.leads.forEach { lead ->
+            if (lead.isCompleted(state, caseDef)) {
+                completed.add(lead.id)
+            }
+        }
+        return completed
+    }
+
+    fun evaluateInvestigationMoments(state: CaseState, caseDef: CaseDefinition): List<InvestigationMoment> {
+        return caseDef.investigationMoments.filter { moment ->
+            !state.seenMomentIds.contains(moment.id) &&
+                (moment.triggerCondition == null || moment.triggerCondition.isMet(state, caseDef))
+        }.sortedByDescending { it.priority }
+    }
 }

@@ -75,15 +75,7 @@ fun SuspectInterviewScreen(
 
     var currentSpeaker by remember { mutableStateOf(suspect.name) }
     var currentDialogueText by remember {
-        mutableStateOf(
-            when (behaviorState) {
-                SuspectBehaviorState.CORNERED -> "\"I... I don't know what you're talking about! There must be an explanation!\""
-                SuspectBehaviorState.DEFENSIVE -> "\"I've already told you what I know, Detective. Be careful what you insinuate.\""
-                SuspectBehaviorState.NERVOUS -> "\"I'm telling you everything I can... I just want to understand what happened.\""
-                SuspectBehaviorState.ALIBI_VERIFIED -> "\"My alibi is verified, Detective. Let me know if you need anything else.\""
-                else -> "\"I am ready to answer your questions, Detective.\""
-            }
-        )
+        mutableStateOf(suspect.getDynamicGreeting(state, caseDef))
     }
     var currentEmotion by remember { mutableStateOf(defaultEmotion) }
     var showPresentEvidenceModal by remember { mutableStateOf(false) }

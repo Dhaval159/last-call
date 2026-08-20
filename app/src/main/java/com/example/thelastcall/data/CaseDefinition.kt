@@ -71,6 +71,9 @@ interface CaseDefinition {
     val reactions: List<EvidenceReaction>
     val timelineEvents: List<TimelineEvent>
     val objectives: List<Objective>
+    val leads: List<InvestigationLead> get() = emptyList()
+    val investigationMoments: List<InvestigationMoment> get() = emptyList()
+    val centralQuestion: String get() = "Determine what happened to the victim and identify the culprit."
     val contradictions: List<Contradiction>
     val contradictionChallenges: List<ContradictionChallenge> get() = emptyList()
     val communicationThreads: List<CommunicationThread> get() = emptyList()
@@ -112,12 +115,38 @@ interface CaseDefinition {
     fun getHotspot(id: String): CrimeSceneHotspot? =
         crimeSceneHotspots.find { it.id == id }
 
+    fun getLead(id: String): InvestigationLead? =
+        leads.find { it.id == id }
+
+    fun getInvestigationMoment(id: String): InvestigationMoment? =
+        investigationMoments.find { it.id == id }
+
     fun getReaction(suspectId: String, evidenceId: String): EvidenceReaction? =
         reactions.find { it.suspectId == suspectId && it.evidenceId == evidenceId }
 
     /** The active detective lead: the first objective not yet followed up. */
     fun getCurrentLead(state: CaseState): Objective? =
         objectives.firstOrNull { !state.completedObjectiveIds.contains(it.id) }
+
+    fun getCurrentInvestigationLead(state: CaseState): InvestigationLead? {
+        if (state.activeLeadId != null) {
+            val explicit = getLead(state.activeLeadId)
+            if (explicit != null && !state.completedLeadIds.contains(explicit.id) && !explicit.isCompleted(state, this)) {
+                return explicit
+            }
+        }
+        return leads.firstOrNull { lead ->
+            !state.completedLeadIds.contains(lead.id) && !lead.isCompleted(state, this) && lead.isUnlocked(state, this)
+        } ?: leads.firstOrNull { !state.completedLeadIds.contains(it.id) && !it.isCompleted(state, this) }
+    }
+
+    fun getDynamicCentralQuestion(state: CaseState): String {
+        val currentLead = getCurrentInvestigationLead(state)
+        if (currentLead?.centralQuestion != null) {
+            return currentLead.centralQuestion
+        }
+        return centralQuestion
+    }
 
     fun checkContradictionPair(source1Id: String, source2Id: String): Contradiction? {
         val s1 = source1Id.trim()

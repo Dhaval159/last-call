@@ -73,6 +73,32 @@ data class Suspect(
             else -> SuspectBehaviorState.CALM
         }
     }
+
+    fun getDynamicGreeting(
+        state: CaseState,
+        caseDef: CaseDefinition
+    ): String {
+        val isCleared = state.clearedSuspectIds.contains(id)
+        val presented = state.presentedEvidenceRecords[id] ?: emptySet()
+        val askedCount = state.askedQuestionIds.filter { qId ->
+            caseDef.questions.any { it.id == qId && it.suspectId == id }
+        }.size
+        val hasContradictionExposed = caseDef.contradictions.filter { it.suspectId == id }
+            .any { state.unlockedContradictionIds.contains(it.id) }
+        val hasMotiveExposed = (caseDef.culpritSolution.culpritSuspectId == id && state.hasDiscoveredMotive) ||
+            caseDef.reactions.filter { it.suspectId == id && it.triggersMotiveId != null }
+                .any { presented.contains(it.evidenceId) }
+
+        val behavior = getDynamicBehaviorState(isCleared, hasContradictionExposed, hasMotiveExposed, askedCount, presented.size)
+        return when (behavior) {
+            SuspectBehaviorState.CORNERED -> "\"I... I don't know what you're talking about! There must be an explanation!\""
+            SuspectBehaviorState.DEFENSIVE -> "\"I've already told you what I know, Detective. Be careful what you insinuate.\""
+            SuspectBehaviorState.NERVOUS -> "\"I'm telling you everything I can... I just want to understand what happened.\""
+            SuspectBehaviorState.ALIBI_VERIFIED -> "\"My alibi is verified, Detective. Let me know if you need anything else.\""
+            SuspectBehaviorState.COOPERATIVE -> "\"I want to help get to the bottom of this, Detective. Ask what you need.\""
+            SuspectBehaviorState.CALM -> "\"I am ready to answer your questions, Detective.\""
+        }
+    }
 }
 
 data class InterviewQuestion(
@@ -162,6 +188,41 @@ sealed interface ObjectiveCondition {
             val hasOpportunity = caseDef.culpritSolution.requiredTimeAnchorEvidenceIds.all { state.discoveredEvidenceIds.contains(it) } &&
                     (!requireContradiction || caseDef.culpritSolution.requiredContradictionIds.all { state.unlockedContradictionIds.contains(it) })
             return hasMotive && hasOpportunity
+        }
+    }
+
+    data class InspectEvidence(val evidenceIds: List<String>, val matchAll: Boolean = true) : ObjectiveCondition {
+        override fun isMet(state: CaseState, caseDef: CaseDefinition): Boolean {
+            return if (matchAll) state.inspectedEvidenceIds.containsAll(evidenceIds)
+            else evidenceIds.any { state.inspectedEvidenceIds.contains(it) }
+        }
+    }
+
+    data class InspectHotspots(val hotspotIds: List<String>, val matchAll: Boolean = true) : ObjectiveCondition {
+        override fun isMet(state: CaseState, caseDef: CaseDefinition): Boolean {
+            return if (matchAll) state.inspectedHotspotIds.containsAll(hotspotIds)
+            else hotspotIds.any { state.inspectedHotspotIds.contains(it) }
+        }
+    }
+
+    data class RecordedStatements(val statementIds: List<String>, val matchAll: Boolean = true) : ObjectiveCondition {
+        override fun isMet(state: CaseState, caseDef: CaseDefinition): Boolean {
+            return if (matchAll) state.recordedStatementIds.containsAll(statementIds)
+            else statementIds.any { state.recordedStatementIds.contains(it) }
+        }
+    }
+
+    data class ClearedSuspects(val suspectIds: List<String>, val matchAll: Boolean = true) : ObjectiveCondition {
+        override fun isMet(state: CaseState, caseDef: CaseDefinition): Boolean {
+            return if (matchAll) state.clearedSuspectIds.containsAll(suspectIds)
+            else suspectIds.any { state.clearedSuspectIds.contains(it) }
+        }
+    }
+
+    data class UnlockedTimelineEvents(val eventIds: List<String>, val matchAll: Boolean = true) : ObjectiveCondition {
+        override fun isMet(state: CaseState, caseDef: CaseDefinition): Boolean {
+            return if (matchAll) state.unlockedTimelineEventIds.containsAll(eventIds)
+            else eventIds.any { state.unlockedTimelineEventIds.contains(it) }
         }
     }
 
@@ -404,3 +465,131 @@ data class CallLogEntry(
     val linkedEvidenceId: String,
     val isCritical: Boolean = false
 )
+
+enum class LeadStatus(val label: String) {
+    LOCKED("Locked"),
+    AVAILABLE("Available"),
+    ACTIVE("Active"),
+    COMPLETED("Completed"),
+    OPTIONAL("Optional")
+}
+
+sealed interface LeadActionTarget {
+    object Hub : LeadActionTarget
+    data class CrimeScene(val hotspotId: String? = null) : LeadActionTarget
+    data class Evidence(val evidenceId: String) : LeadActionTarget
+    data class Suspect(val suspectId: String, val questionId: String? = null) : LeadActionTarget
+    data class Communication(val threadId: String? = null) : LeadActionTarget
+    data class Timeline(val eventId: String? = null) : LeadActionTarget
+    data class Reasoning(val tab: CaseFileTab = CaseFileTab.DEDUCTIONS) : LeadActionTarget
+    data class CaseFile(val tab: CaseFileTab = CaseFileTab.EVIDENCE) : LeadActionTarget
+    object DetectiveBoard : LeadActionTarget
+    object CaseReview : LeadActionTarget
+}
+
+data class LeadObjective(
+    val id: String,
+    val title: String,
+    val description: String,
+    val actionLabel: String? = null,
+    val target: LeadActionTarget = LeadActionTarget.Hub,
+    val condition: ObjectiveCondition? = null,
+    val isOptional: Boolean = false,
+    val hint: String? = null
+)
+
+data class InvestigationLead(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val shortDescription: String,
+    val briefing: String,
+    val objectives: List<LeadObjective>,
+    val unlockLeadIds: List<String> = emptyList(),
+    val unlockEvidenceIds: List<String> = emptyList(),
+    val completionSummary: String = "",
+    val nextLeadId: String? = null,
+    val isMajorBreakthrough: Boolean = false,
+    val breakthroughTitle: String? = null,
+    val breakthroughDescription: String? = null,
+    val associatedEvidenceIds: List<String> = emptyList(),
+    val associatedSuspectIds: List<String> = emptyList(),
+    val associatedLocation: String? = null,
+    val centralQuestion: String? = null,
+    val isOptional: Boolean = false,
+    val orderIndex: Int = 0
+) {
+    val totalRequiredObjectives: Int
+        get() = objectives.count { !it.isOptional }
+
+    fun isCompleted(state: CaseState, caseDef: CaseDefinition): Boolean {
+        val required = objectives.filter { !it.isOptional }
+        if (required.isEmpty()) return false
+        return required.all { obj ->
+            state.completedLeadObjectiveIds.contains(obj.id) ||
+                (obj.condition != null && obj.condition.isMet(state, caseDef))
+        }
+    }
+
+    fun isUnlocked(state: CaseState, caseDef: CaseDefinition): Boolean {
+        if (unlockLeadIds.isNotEmpty() && !unlockLeadIds.all { state.completedLeadIds.contains(it) }) {
+            return false
+        }
+        if (unlockEvidenceIds.isNotEmpty() && !unlockEvidenceIds.all { state.discoveredEvidenceIds.contains(it) }) {
+            return false
+        }
+        return true
+    }
+
+    fun getStatus(state: CaseState, caseDef: CaseDefinition): LeadStatus {
+        if (state.completedLeadIds.contains(id) || isCompleted(state, caseDef)) {
+            return LeadStatus.COMPLETED
+        }
+        if (state.activeLeadId == id) {
+            return LeadStatus.ACTIVE
+        }
+        if (isUnlocked(state, caseDef)) {
+            return if (isOptional) LeadStatus.OPTIONAL else LeadStatus.AVAILABLE
+        }
+        return LeadStatus.LOCKED
+    }
+
+    fun getNextUncompletedObjective(state: CaseState, caseDef: CaseDefinition): LeadObjective? {
+        return objectives.firstOrNull { obj ->
+            !state.completedLeadObjectiveIds.contains(obj.id) &&
+                (obj.condition == null || !obj.condition.isMet(state, caseDef))
+        }
+    }
+}
+
+data class LeadNavigationContext(
+    val sourceLeadId: String,
+    val sourceObjectiveId: String? = null,
+    val leadTitle: String,
+    val returnScreen: Screen = Screen.INVESTIGATION_LEAD
+)
+
+enum class InvestigationMomentType(val displayName: String) {
+    NEW_DEVELOPMENT("New Development"),
+    EVIDENCE_CONNECTION("Evidence Connection"),
+    STATEMENT_UPDATE("Statement Update"),
+    BREAKTHROUGH("Breakthrough"),
+    COMMUNICATION_RECOVERED("Communication Recovered")
+}
+
+data class InvestigationMoment(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val narrativeText: String,
+    val type: InvestigationMomentType = InvestigationMomentType.NEW_DEVELOPMENT,
+    val triggerCondition: ObjectiveCondition? = null,
+    val associatedEvidenceId: String? = null,
+    val associatedSuspectId: String? = null,
+    val associatedLeadId: String? = null,
+    val actionLabel: String = "CONTINUE",
+    val actionTarget: LeadActionTarget = LeadActionTarget.Hub,
+    val isMajorBreakthrough: Boolean = false,
+    val priority: Int = 0
+)
+

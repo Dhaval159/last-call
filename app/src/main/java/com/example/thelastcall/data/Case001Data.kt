@@ -548,6 +548,85 @@ object Case001Data : CaseDefinition {
         Objective("O008", "Make the Final Accusation", "Formulate the accusation against the true culprit with supporting proof.", condition = ObjectiveCondition.CaseSolved, leadActionLabel = "Submit Accusation", leadTarget = Screen.FINAL_CASE_REVIEW, focusTab = CaseFileTab.THEORY)
     )
 
+    val LEADS = listOf(
+        InvestigationLead(
+            id = "LEAD_001_01_SCENE",
+            title = "THE CRIME SCENE AT 7B",
+            subtitle = "Initial Apartment Investigation",
+            shortDescription = "Examine Elias Voss's penthouse study, inspect the desk, and secure initial traces.",
+            briefing = "Elias Voss was found deceased in his penthouse study at Bellweather Heights. The entry was unforced, pointing to someone he knew. Search the study, inspect his phone, and secure documents from the desk.",
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_001_01_SEARCH_DESK",
+                    title = "Search Elias's Study & Desk",
+                    description = "Search the apartment crime scene to secure physical items and financial notes.",
+                    actionLabel = "Search Study",
+                    target = LeadActionTarget.CrimeScene("hotspot_desk"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("E001", "E004", "E007", "E008"))
+                ),
+                LeadObjective(
+                    id = "OBJ_001_01_PHONE_TIME_ANCHOR",
+                    title = "Inspect Outgoing Phone Call",
+                    description = "Inspect Elias's phone to uncover the 10:42 PM outgoing call.",
+                    actionLabel = "Inspect Phone",
+                    target = LeadActionTarget.Evidence("E001"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("E002"))
+                )
+            ),
+            completionSummary = "Phone records prove Elias was alive and placing an outgoing call at 10:42 PM, anchoring the murder window after that moment.",
+            nextLeadId = "LEAD_001_02_SUSPECTS",
+            associatedEvidenceIds = listOf("E001", "E002", "E004", "E007", "E008"),
+            associatedLocation = "Apartment 7B, Bellweather Heights",
+            orderIndex = 1
+        ),
+        InvestigationLead(
+            id = "LEAD_001_02_SUSPECTS",
+            title = "PERSONS OF INTEREST & ALIBIS",
+            subtitle = "Interrogating the Inner Circle",
+            shortDescription = "Interview Maya, Victor, Nora, and Daniel to verify their whereabouts.",
+            briefing = "Four people had contact with Elias on the night of the incident. Interrogate them and cross-examine their claims against transit and network records.",
+            unlockLeadIds = listOf("LEAD_001_01_SCENE"),
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_001_02_INTERVIEW_ALL",
+                    title = "Interview Connected Suspects",
+                    description = "Interview Maya Voss, Victor Hale, Nora Bennett, and Daniel Mercer.",
+                    actionLabel = "Interview Suspects",
+                    target = LeadActionTarget.CaseFile(CaseFileTab.SUSPECTS),
+                    condition = ObjectiveCondition.InterviewSuspects(listOf("S001", "S002", "S003", "S004"))
+                )
+            ),
+            completionSummary = "Initial statements recorded. Daniel claims he left before 10:00 PM and went straight home.",
+            nextLeadId = "LEAD_001_03_CONTRADICTION",
+            associatedSuspectIds = listOf("S001", "S002", "S003", "S004"),
+            orderIndex = 2
+        ),
+        InvestigationLead(
+            id = "LEAD_001_03_CONTRADICTION",
+            title = "THE FALSE DEPARTURE",
+            subtitle = "Building Keycard Logs & Access Records",
+            shortDescription = "Confront Daniel Mercer with building access logs proving his 10:20 PM return.",
+            briefing = "Building security logs and corridor cameras contradict Daniel's claim that he left at 9:50 PM. Confront him with the physical access records.",
+            unlockLeadIds = listOf("LEAD_001_02_SUSPECTS"),
+            isMajorBreakthrough = true,
+            breakthroughTitle = "CRITICAL CONTRADICTION: DANIEL RETURNED AT 10:20 PM",
+            breakthroughDescription = "Daniel Mercer lied about leaving permanently before 10 PM. Access logs place him inside the apartment during the murder window.",
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_001_03_CONFRONT_DANIEL",
+                    title = "Confront Daniel with Access Footage",
+                    description = "Establish the contradiction disproving Daniel's claimed departure.",
+                    actionLabel = "Confront Daniel",
+                    target = LeadActionTarget.Suspect("S004"),
+                    condition = ObjectiveCondition.UnlockContradictions(listOf("C001"))
+                )
+            ),
+            completionSummary = "Daniel Mercer's alibi collapsed. Keycard logs prove he returned at 10:20 PM and fled at 10:45 PM after the fatal assault.",
+            associatedSuspectIds = listOf("S004"),
+            orderIndex = 3
+        )
+    )
+
     val STATEMENTS = listOf(
         StatementItem(
             id = "ST001",
@@ -892,6 +971,7 @@ object Case001Data : CaseDefinition {
     override val reactions: List<EvidenceReaction> get() = EVIDENCE_REACTIONS
     override val timelineEvents: List<TimelineEvent> get() = TIMELINE_EVENTS
     override val objectives: List<Objective> get() = OBJECTIVES
+    override val leads: List<InvestigationLead> get() = LEADS
     override val contradictions: List<Contradiction> get() = CONTRADICTIONS
     override val contradictionChallenges: List<ContradictionChallenge> get() = CONTRADICTION_CHALLENGES
     override val communicationThreads: List<CommunicationThread> get() = COMMUNICATION_THREADS

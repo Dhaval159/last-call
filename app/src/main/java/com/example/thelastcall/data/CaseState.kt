@@ -16,6 +16,7 @@ enum class Screen {
     CASE_INTRO,
     BRIEFING,
     CASE_HUB,
+    INVESTIGATION_LEAD,
     CRIME_SCENE,
     CASE_FILE,
     DETECTIVE_BOARD,
@@ -111,6 +112,10 @@ data class CaseState(
     val unlockedContradictionIds: Set<String> = emptySet(),
     val completedObjectiveIds: Set<String> = emptySet(),
     val inspectedHotspotIds: Set<String> = emptySet(),
+    val activeLeadId: String? = null,
+    val completedLeadIds: Set<String> = emptySet(),
+    val completedLeadObjectiveIds: Set<String> = emptySet(),
+    val leadNavigationContext: LeadNavigationContext? = null,
     val customConnections: List<EvidenceConnection> = emptyList(),
     val playerTheory: PlayerTheory = PlayerTheory(),
     val hasDiscoveredMotive: Boolean = false,
@@ -122,6 +127,9 @@ data class CaseState(
     val hasSeenCrimeSceneTutorial: Boolean = false,
     val playerNotes: List<PlayerNote> = emptyList(),
     val pendingChallengeId: String? = null,
+    val seenMomentIds: Set<String> = emptySet(),
+    val pendingMomentId: String? = null,
+    val pendingEvidenceDiscoveryId: String? = null,
     val activityLog: List<ActivityLogEntry> = emptyList(),
     val investigationMinutes: Int = 0
 ) {

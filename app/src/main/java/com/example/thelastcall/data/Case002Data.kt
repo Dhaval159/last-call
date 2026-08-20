@@ -865,6 +865,349 @@ object Case002Data : CaseDefinition {
         Objective("O008", "Submit Final Accusation", "Formulate the complete case against the true culprit with supporting evidence.", condition = ObjectiveCondition.CaseSolved, leadActionLabel = "Indict Culprit", leadTarget = Screen.FINAL_CASE_REVIEW, focusTab = CaseFileTab.THEORY)
     )
 
+    val LEADS = listOf(
+        InvestigationLead(
+            id = "LEAD_002_01_CELLAR_SCENE",
+            title = "THE SCENE IN THE CELLAR",
+            subtitle = "Staged Robbery & Postmortem Discrepancies",
+            shortDescription = "Examine the Floor 29 discovery scene, uncover the postmortem transfer, and question Theo Marsh.",
+            briefing = "At 12:10 AM, head bartender Theo Marsh reported discovering Elena Voss deceased in the Floor 29 wine cellar. The scene presents initial signs of a burglary: shattered wine shelves, a forced reserve vintage case, and an open loading dock door. Search the scene, document the evidence, inspect the body for trauma patterns, question the discoverer, and establish the initial forensic reality.",
+            centralQuestion = "Did Elena die in the wine cellar, or was the discovery scene staged?",
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_01_SEARCH_CELLAR",
+                    title = "Search the Floor 29 Wine Cellar",
+                    description = "Examine the crime scene to secure the body position, broken shelf, and missing vintage bottle.",
+                    actionLabel = "Search Cellar",
+                    target = LeadActionTarget.CrimeScene("hotspot_body"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-01", "EVD-02", "EVD-03"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_01_EXAMINE_BODY",
+                    title = "Examine Victim & Forensic Discrepancies",
+                    description = "Inspect the body in detail to review the medical examiner's findings on cause of death and lividity.",
+                    actionLabel = "Examine Body",
+                    target = LeadActionTarget.Evidence("EVD-01"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-05"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_01_INTERVIEW_THEO",
+                    title = "Interview Discoverer Theo Marsh",
+                    description = "Question Theo Marsh about his arrival in the cellar and the missing 1990 Bordeaux.",
+                    actionLabel = "Interview Theo",
+                    target = LeadActionTarget.Suspect("SUS-02", "Q_TM_1"),
+                    condition = ObjectiveCondition.AskQuestions(listOf("Q_TM_1"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_01_CHECK_DOCK",
+                    title = "Inspect Loading Dock Service Exit",
+                    description = "Check the Floor 29 loading dock door to verify the reported burglar's escape route.",
+                    actionLabel = "Check Dock Door",
+                    target = LeadActionTarget.CrimeScene("hotspot_dock_door"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-04"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_01_STAGED_SCENE",
+                    title = "Establish Staged Crime Scene Deduction",
+                    description = "Form the deduction establishing that Elena died elsewhere and was moved into the cellar postmortem.",
+                    actionLabel = "Review Reasoning",
+                    target = LeadActionTarget.Reasoning(CaseFileTab.DEDUCTIONS),
+                    condition = ObjectiveCondition.FormDeductions(listOf("D001_STAGED_SCENE"))
+                )
+            ),
+            completionSummary = "Forensic evidence establishes that Elena Voss did not die in the wine cellar. Fixed posterior lividity proves she lay flat on her back for 20-30 minutes postmortem before being positioned on her side beside the broken shelving. The wine cellar struggle and robbery were staged.",
+            nextLeadId = "LEAD_002_02_TIMELINES_AND_DEPARTURES",
+            associatedEvidenceIds = listOf("EVD-01", "EVD-02", "EVD-03", "EVD-04", "EVD-05"),
+            associatedSuspectIds = listOf("SUS-02"),
+            associatedLocation = "Floor 29 — Wine Cellar",
+            orderIndex = 1
+        ),
+        InvestigationLead(
+            id = "LEAD_002_02_TIMELINES_AND_DEPARTURES",
+            title = "THE 11:05 PM RE-ENTRY & FALSE ALIBIS",
+            subtitle = "Electronic Access Logs & Initial Contradictions",
+            shortDescription = "Compare suspect statements against Floor 30 electronic badge logs and uncover initial timeline conflicts.",
+            briefing = "Now that we know the cellar was staged, we must reconstruct who was truly present on Floor 30 during the critical late-night window. Security badge records and suspect testimonies must be cross-examined to expose false departures.",
+            centralQuestion = "Who re-entered Floor 30 around 11:00 PM and what were they hiding?",
+            unlockLeadIds = listOf("LEAD_002_01_CELLAR_SCENE"),
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_02_DAVID_BADGE",
+                    title = "Review Floor 30 Security Badge Logs",
+                    description = "Inspect electronic elevator access records for suspect movements around 11:00 PM.",
+                    actionLabel = "Review Logs",
+                    target = LeadActionTarget.CrimeScene("hotspot_security_console"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-13"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_02_CONFRONT_DAVID",
+                    title = "Confront David Ostrow with Badge Re-entry",
+                    description = "Expose David's false 10:45 PM departure using his 11:05 PM elevator badge swipe.",
+                    actionLabel = "Confront David",
+                    target = LeadActionTarget.Suspect("SUS-01"),
+                    condition = ObjectiveCondition.UnlockContradictions(listOf("C001_DAVID_DEPARTURE"))
+                )
+            ),
+            completionSummary = "David Ostrow's claimed 10:45 PM departure was disproven. He swiped back onto Floor 30 at 11:05 PM and argued furiously with Elena over the acquisition deal before departing by rideshare at 11:19 PM.",
+            nextLeadId = "LEAD_002_03_ROOFTOP_FORENSICS",
+            associatedEvidenceIds = listOf("EVD-13", "EVD-14", "EVD-15"),
+            associatedSuspectIds = listOf("SUS-01"),
+            associatedLocation = "Floor 28 — Security Office",
+            orderIndex = 2
+        ),
+        InvestigationLead(
+            id = "LEAD_002_03_ROOFTOP_FORENSICS",
+            title = "THE ROOFTOP CRIME SCENE",
+            subtitle = "Forensic Traces on Floor 30",
+            shortDescription = "Investigate the rooftop terrace and locate the true scene of the fatal trauma.",
+            briefing = "Microscopic wound analysis revealed limestone residue completely foreign to the concrete cellar. Search the Floor 30 rooftop deck to identify where Elena suffered the fatal impact.",
+            centralQuestion = "Where did Elena actually die, and what physical traces remain on the rooftop?",
+            unlockLeadIds = listOf("LEAD_002_02_TIMELINES_AND_DEPARTURES"),
+            isMajorBreakthrough = true,
+            breakthroughTitle = "TRUE CRIME SCENE IDENTIFIED: FLOOR 30 ROOFTOP",
+            breakthroughDescription = "Luminol forensics and physical jewelry confirm Elena Voss died at the Floor 30 stone planter ledge, not in the cellar.",
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_03_EXAMINE_ROOF",
+                    title = "Search the Floor 30 Rooftop Planter",
+                    description = "Search the outdoor terrace to recover stone residue and Elena's lost earring.",
+                    actionLabel = "Search Rooftop",
+                    target = LeadActionTarget.CrimeScene("hotspot_planter"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-06", "EVD-07", "EVD-08"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_03_ROOF_DEDUCTION",
+                    title = "Establish Rooftop True Scene Deduction",
+                    description = "Form the deduction proving Floor 30 was the true scene of death.",
+                    actionLabel = "Form Deduction",
+                    target = LeadActionTarget.Reasoning(CaseFileTab.DEDUCTIONS),
+                    condition = ObjectiveCondition.FormDeductions(listOf("D002_ROOFTOP_TRUE_SCENE"))
+                )
+            ),
+            completionSummary = "Luminol testing on the Floor 30 architectural planter ledge confirmed Elena's blood, and her pearl earring stud was found wedged into the adjacent teak decking. The rooftop terrace is the true scene of the fatal head impact.",
+            nextLeadId = "LEAD_002_04_COMMUNICATIONS_AND_ALIBIS",
+            associatedEvidenceIds = listOf("EVD-06", "EVD-07", "EVD-08"),
+            associatedLocation = "Floor 30 — Rooftop Deck",
+            orderIndex = 3
+        ),
+        InvestigationLead(
+            id = "LEAD_002_04_COMMUNICATIONS_AND_ALIBIS",
+            title = "DIGITAL THREADS & TIME ANCHORS",
+            subtitle = "Reconstructing the Final Minutes",
+            shortDescription = "Recover communication records and Elena's final voice memo to establish alibis.",
+            briefing = "Extract Elena's encrypted smartphone recordings and verify suspect communication threads to isolate the exact minutes of the murder.",
+            centralQuestion = "Who was on the roof during the critical murder window between 11:28 and 11:32 PM?",
+            unlockLeadIds = listOf("LEAD_002_03_ROOFTOP_FORENSICS"),
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_04_VOICE_MEMO",
+                    title = "Recover 11:27 PM Voice Memo",
+                    description = "Analyze Elena's phone audio proving she was peaceful and alone at 11:27 PM.",
+                    actionLabel = "Review Audio",
+                    target = LeadActionTarget.Evidence("EVD-10"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-09", "EVD-10"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_04_CLEAR_ALIBIS",
+                    title = "Clear Innocent Suspects",
+                    description = "Form deductions establishing that David, Theo, Priya, and Iris are cleared.",
+                    actionLabel = "Review Alibis",
+                    target = LeadActionTarget.Reasoning(CaseFileTab.DEDUCTIONS),
+                    condition = ObjectiveCondition.FormDeductions(listOf("D003_ALIBIS_CLEARED"))
+                )
+            ),
+            completionSummary = "Elena's 11:27 PM voice memo and independent GPS logs conclusively clear David, Theo, Priya, and Iris, narrowing the fatal encounter to 11:28 PM - 11:32 PM.",
+            nextLeadId = "LEAD_002_05_THE_SERVICE_STAIRWELL",
+            associatedEvidenceIds = listOf("EVD-09", "EVD-10", "EVD-15", "EVD-19", "EVD-26"),
+            orderIndex = 4
+        ),
+        InvestigationLead(
+            id = "LEAD_002_05_THE_SERVICE_STAIRWELL",
+            title = "THE UNMONITORED STAIRWELL",
+            subtitle = "The Standalone Keypad Subsystem",
+            shortDescription = "Examine the unmonitored service stairwell logs to shatter Renata Cole's security alibi.",
+            briefing = "Renata Cole claimed she never visited the roof and edited master CCTV logs. But the camera-free service stairwell runs on an independent legacy keypad controller. Extract the unscrubbed logs.",
+            centralQuestion = "Who bypassed the building's master security cameras to transport the victim?",
+            unlockLeadIds = listOf("LEAD_002_04_COMMUNICATIONS_AND_ALIBIS"),
+            isMajorBreakthrough = true,
+            breakthroughTitle = "DECISIVE CONTRADICTION: KEYPAD PIN 4491",
+            breakthroughDescription = "Renata Cole's personal PIN was recorded entering the roof at 11:26 PM and exiting the cellar at 11:52 PM.",
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_05_KEYPAD_LOGS",
+                    title = "Extract Service Stairwell Keypad Logs",
+                    description = "Recover access timestamps from the legacy stairwell access controller.",
+                    actionLabel = "Inspect Keypad",
+                    target = LeadActionTarget.CrimeScene("hotspot_stairwell_keypad"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-22"))
+                ),
+                LeadObjective(
+                    id = "OBJ_002_05_RENATA_CONTRADICTION",
+                    title = "Confront Renata Cole with Dual Keypad Logs",
+                    description = "Establish the decisive contradiction shattering Renata's master console alibi.",
+                    actionLabel = "Confront Renata",
+                    target = LeadActionTarget.Suspect("SUS-04"),
+                    condition = ObjectiveCondition.UnlockContradictions(listOf("C005_RENATA_LOG_CONTRADICTION"))
+                )
+            ),
+            completionSummary = "Renata Cole's exclusive PIN code 4491 places her on the rooftop deck at 11:26 PM immediately prior to Elena's fall, and in the Floor 29 wine cellar at 11:52 PM staging the body.",
+            nextLeadId = "LEAD_002_06_FINAL_PROSECUTION",
+            associatedEvidenceIds = listOf("EVD-21", "EVD-22", "EVD-23"),
+            associatedSuspectIds = listOf("SUS-04"),
+            associatedLocation = "Floor 29/30 — Service Stairwell",
+            orderIndex = 5
+        ),
+        InvestigationLead(
+            id = "LEAD_002_06_FINAL_PROSECUTION",
+            title = "THE FINAL CHARGE",
+            subtitle = "Synthesizing the Prosecution Dossier",
+            shortDescription = "Assemble all forensic pillars, motive, weapon, and time anchors to indict the culprit.",
+            briefing = "With all innocent parties cleared, the rooftop true crime scene established, and Renata's dual-system contradiction locked in, finalize the indictment.",
+            centralQuestion = "Can we establish the complete motive, weapon, and time anchors to convict the culprit?",
+            unlockLeadIds = listOf("LEAD_002_05_THE_SERVICE_STAIRWELL"),
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_06_BUILD_THEORY",
+                    title = "Establish Complete Case Theory",
+                    description = "Designate Renata Cole, heartbreak motive, and stone planter weapon in your Theory.",
+                    actionLabel = "Open Theory",
+                    target = LeadActionTarget.Reasoning(CaseFileTab.THEORY),
+                    condition = ObjectiveCondition.DiscoveredMotiveAndOpportunity()
+                ),
+                LeadObjective(
+                    id = "OBJ_002_06_INDICT",
+                    title = "Submit Final Indictment",
+                    description = "Formulate the accusation and secure a conviction.",
+                    actionLabel = "Indict Culprit",
+                    target = LeadActionTarget.CaseReview,
+                    condition = ObjectiveCondition.CaseSolved
+                )
+            ),
+            completionSummary = "Renata Cole was formally convicted of the homicide of Elena Voss.",
+            associatedSuspectIds = listOf("SUS-04"),
+            orderIndex = 6
+        ),
+        InvestigationLead(
+            id = "LEAD_002_OPTIONAL_TITAN_DEAL",
+            title = "TITAN CAPITAL & THE MERIDIAN BUYOUT",
+            subtitle = "Corporate Maneuvers & Side Deals",
+            shortDescription = "Investigate the financial motives and background behind the impending corporate buyout.",
+            briefing = "Examine the secret communications and agreements between Whit Sokol and David Ostrow to understand the full financial pressure surrounding Elena's planned departure.",
+            centralQuestion = "What were the financial ramifications of Elena killing the Titan acquisition?",
+            unlockEvidenceIds = listOf("EVD-16"),
+            isOptional = true,
+            objectives = listOf(
+                LeadObjective(
+                    id = "OBJ_002_OPT_ANALYZE_DEAL",
+                    title = "Analyze Titan Deal Voiding Clause",
+                    description = "Review Whit Sokol's acquisition documents to understand why Elena's death hurts Titan.",
+                    actionLabel = "Review Documents",
+                    target = LeadActionTarget.Evidence("EVD-16"),
+                    condition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-16", "EVD-17")),
+                    isOptional = true
+                ),
+                LeadObjective(
+                    id = "OBJ_002_OPT_SIDE_DEAL",
+                    title = "Establish Side Deal Deduction",
+                    description = "Deduce how David and Whit were secretly scheming behind Elena's back.",
+                    actionLabel = "Form Deduction",
+                    target = LeadActionTarget.Reasoning(CaseFileTab.DEDUCTIONS),
+                    condition = ObjectiveCondition.FormDeductions(listOf("D004_DAVID_WHIT_SIDE_DEAL")),
+                    isOptional = true
+                )
+            ),
+            completionSummary = "Titan Hospitality's contract strictly voided without Elena Voss, proving Whit Sokol had every reason to keep her alive.",
+            associatedEvidenceIds = listOf("EVD-13", "EVD-16", "EVD-17"),
+            associatedSuspectIds = listOf("SUS-01", "SUS-06"),
+            orderIndex = 7
+        )
+    )
+
+    val INVESTIGATION_MOMENTS = listOf(
+        InvestigationMoment(
+            id = "MOMENT_002_01_CELLAR_DISCREPANCY",
+            title = "FORENSIC DISCREPANCY",
+            subtitle = "Autopsy vs. Discovery Scene",
+            narrativeText = "The coroner's preliminary report establishes fixed posterior lividity. Elena lay flat on her back for 20 to 30 minutes before being placed on her side in the wine cellar. This cellar was not the true scene of death.",
+            type = InvestigationMomentType.NEW_DEVELOPMENT,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-05")),
+            associatedEvidenceId = "EVD-05",
+            associatedLeadId = "LEAD_002_01_CELLAR_SCENE",
+            actionLabel = "EXAMINE AUTOPSY",
+            actionTarget = LeadActionTarget.Evidence("EVD-05"),
+            priority = 10
+        ),
+        InvestigationMoment(
+            id = "MOMENT_002_02_DAVID_BADGE",
+            title = "STATEMENT CONFLICT",
+            subtitle = "David Ostrow's Alibi Collapses",
+            narrativeText = "Floor 30 elevator badge records prove David Ostrow swiped back in at 11:05 PM. This directly conflicts with his initial statement claiming he departed at 10:45 PM.",
+            type = InvestigationMomentType.STATEMENT_UPDATE,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-13")),
+            associatedEvidenceId = "EVD-13",
+            associatedSuspectId = "SUS-01",
+            associatedLeadId = "LEAD_002_02_TIMELINES_AND_DEPARTURES",
+            actionLabel = "RE-INTERVIEW DAVID",
+            actionTarget = LeadActionTarget.Suspect("SUS-01"),
+            priority = 20
+        ),
+        InvestigationMoment(
+            id = "MOMENT_002_03_ROOFTOP_CONNECTION",
+            title = "FORENSIC CONNECTION",
+            subtitle = "Wound Matches Rooftop Stone Planter",
+            narrativeText = "Microscopic limestone dust recovered from Elena's fatal head trauma corresponds precisely with the architectural stone planter on the Floor 30 rooftop deck. Elena died on the rooftop terrace.",
+            type = InvestigationMomentType.EVIDENCE_CONNECTION,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-06", "EVD-08")),
+            associatedEvidenceId = "EVD-08",
+            associatedLeadId = "LEAD_002_03_ROOFTOP_FORENSICS",
+            actionLabel = "EXAMINE ROOFTOP TRACES",
+            actionTarget = LeadActionTarget.CrimeScene("hotspot_planter"),
+            isMajorBreakthrough = true,
+            priority = 30
+        ),
+        InvestigationMoment(
+            id = "MOMENT_002_04_VOICE_MEMO",
+            title = "CRITICAL TIME ANCHOR",
+            subtitle = "Elena's 11:27 PM Voice Memo Recovered",
+            narrativeText = "Elena recorded an unsent voice memo alone on the rooftop deck at 11:27 PM, completely peaceful. This single recording clears Priya Nandan and Iris Chen, narrowing the fatal encounter to 11:28 PM – 11:32 PM.",
+            type = InvestigationMomentType.COMMUNICATION_RECOVERED,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-10")),
+            associatedEvidenceId = "EVD-10",
+            associatedLeadId = "LEAD_002_04_COMMUNICATIONS_AND_ALIBIS",
+            actionLabel = "LISTEN TO MEMO",
+            actionTarget = LeadActionTarget.Evidence("EVD-10"),
+            priority = 40
+        ),
+        InvestigationMoment(
+            id = "MOMENT_002_05_STAIRWELL_KEYPAD",
+            title = "DECISIVE CONTRADICTION",
+            subtitle = "Legacy Keypad PIN 4491 Logged",
+            narrativeText = "While the master CCTV console shows zero rooftop activity, the independent service stairwell keypad recorded PIN 4491—assigned exclusively to Renata Cole—entering the roof at 11:26 PM and exiting the cellar at 11:52 PM.",
+            type = InvestigationMomentType.BREAKTHROUGH,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-22")),
+            associatedEvidenceId = "EVD-22",
+            associatedSuspectId = "SUS-04",
+            associatedLeadId = "LEAD_002_05_THE_SERVICE_STAIRWELL",
+            actionLabel = "CONFRONT RENATA",
+            actionTarget = LeadActionTarget.Suspect("SUS-04"),
+            isMajorBreakthrough = true,
+            priority = 50
+        ),
+        InvestigationMoment(
+            id = "MOMENT_002_06_OPTIONAL_TITAN",
+            title = "BEHIND THE ACQUISITION",
+            subtitle = "Titan Capital's Key-Person Clause",
+            narrativeText = "Titan Hospitality's acquisition agreement contained an explicit voiding clause: the buyout terminates if Elena Voss is not attached to the business for two years. Her death destroys Whit Sokol's deal.",
+            type = InvestigationMomentType.NEW_DEVELOPMENT,
+            triggerCondition = ObjectiveCondition.DiscoverEvidence(listOf("EVD-16", "EVD-17")),
+            associatedEvidenceId = "EVD-16",
+            associatedLeadId = "LEAD_002_OPTIONAL_TITAN_DEAL",
+            actionLabel = "REVIEW DEAL RECORDS",
+            actionTarget = LeadActionTarget.CaseFile(CaseFileTab.EVIDENCE),
+            priority = 15
+        )
+    )
+
     val CONTRADICTIONS = listOf(
         Contradiction(
             id = "C001_DAVID_DEPARTURE",
@@ -1267,7 +1610,7 @@ object Case002Data : CaseDefinition {
             title = "Wine Cellar is a Staged Crime Scene",
             reasoning = "Coroner's posterior lividity and stone residue in the head wound prove Elena did not die in the concrete cellar; the body was moved postmortem.",
             supportingEvidenceIds = listOf("EVD-01", "EVD-02", "EVD-05", "EVD-06"),
-            requiredEvidence = listOf("EVD-05", "EVD-06")
+            requiredEvidence = listOf("EVD-01", "EVD-05")
         ),
         Deduction(
             id = "D002_ROOFTOP_TRUE_SCENE",
@@ -1438,6 +1781,9 @@ object Case002Data : CaseDefinition {
     override val reactions: List<EvidenceReaction> get() = EVIDENCE_REACTIONS
     override val timelineEvents: List<TimelineEvent> get() = TIMELINE_EVENTS
     override val objectives: List<Objective> get() = OBJECTIVES
+    override val leads: List<InvestigationLead> get() = LEADS
+    override val investigationMoments: List<InvestigationMoment> get() = INVESTIGATION_MOMENTS
+    override val centralQuestion: String get() = "Investigate Elena Voss's death, uncover the staged cellar scene, and identify the true culprit on Floor 30."
     override val contradictions: List<Contradiction> get() = CONTRADICTIONS
     override val contradictionChallenges: List<ContradictionChallenge> get() = CONTRADICTION_CHALLENGES
     override val communicationThreads: List<CommunicationThread> get() = COMMUNICATION_THREADS
@@ -1537,8 +1883,8 @@ object Case002Data : CaseDefinition {
     ): Pair<Deduction?, String?> {
         val ids = setOf(source1Id.trim(), source2Id.trim())
 
-        // D001: Staged Wine Cellar (EVD-05 + EVD-06 with ESTABLISHES/SUPPORTS/CONTRADICTS)
-        if (ids.contains("EVD-05") && ids.contains("EVD-06")) {
+        // D001: Staged Wine Cellar (EVD-05 + EVD-06 or EVD-01 + EVD-05 with ESTABLISHES/SUPPORTS/CONTRADICTS)
+        if ((ids.contains("EVD-05") && ids.contains("EVD-06")) || (ids.contains("EVD-01") && ids.contains("EVD-05"))) {
             return Pair(getDeduction("D001_STAGED_SCENE"), "Posterior lividity and stone residue in the cranial wound prove the victim was moved to the cellar postmortem.")
         }
 
